@@ -5,6 +5,7 @@ Notes on how to use TensorFlow, heavily based on the Stanford University Tensorf
 # Table of Contents
 1. [Overview of TensorFlow](#lecture1)
 2. [TensorFlow Operations](#lecture2)
+3. [Basic Models in TensorFlow](#lecture3)
 
 ## Overview of TensorFlow <a name="lecture1"></a>
 
@@ -258,4 +259,76 @@ with tf.Session() as sess:
 ```
 1. Separate definition of ops from computing/running ops 
 2. Use Python property to ensure function is also loaded once the first time it is called
+```
+
+## Basic Models in TensorFlow<a name="lecture3"></a>
+
+### Linear Regression in TensorFlow
+For a linear regression, we want to model the linear relationship between:
+- dependent variable Y
+- explanatory variables X
+
+### Example
+
+```
+World Development Indicators dataset
+X: birth rate
+Y: life expectancy
+190 countries
+GOAL: Find a linear relationship between X and Y to predict Y from X
+```
+**Model**
+```
+Inference: Y_predicted = w * X + b
+Mean squared error: E[(y - y_predicted)^2]
+```
+
+**Code example**
+- `03_linreg_starter.py` 
+```
+> python3 03_linreg_starter.py
+> tensorboard --logdir='./graphs'
+```
+Some Code notes from Example
+```
+tf.data.Dataset.from_tensor_slices((features, labels))
+
+dataset = tf.data.Dataset.from_tensor_slices((data[:,0], data[:,1]))
+print(dataset.output_types)        # >> (tf.float32, tf.float32)
+print(dataset.output_shapes)        # >> (TensorShape([]), TensorShape([]))
+
+tf.data.TextLineDataset(filenames)
+tf.data.FixedLengthRecordDataset(filenames)
+tf.data.TFRecordDataset(filenames)
+```
+Making an Iterator
+```
+iterator = dataset.make_one_shot_iterator()
+# Iterates through the dataset exactly once. No need to initialization.
+
+iterator = dataset.make_initializable_iterator()
+#Iterates through the dataset as many times as we want. Need to initialize with each epoch.
+```
+
+Performing Operations on the dataset
+```python
+dataset = dataset.shuffle(1000)
+dataset = dataset.repeat(100)
+dataset = dataset.batch(128)
+dataset = dataset.map(lambda x: tf.one_hot(x, 10))  # convert each elem of dataset to one_hot vector
+```
+
+Specify if you want to train the variable
+```python
+tf.Variable(initial_value=None, trainable=True,...)
+```
+
+List of Optimizers in TensorFlow
+```python
+tf.train.GradientDescentOptimizer
+tf.train.AdagradOptimizer
+tf.train.MomentumOptimizer
+tf.train.AdamOptimizer
+tf.train.FtrlOptimizer
+tf.train.RMSPropOptimizer
 ```
