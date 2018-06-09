@@ -6,6 +6,10 @@ Notes on how to use TensorFlow, heavily based on the Stanford University Tensorf
 1. [Overview of TensorFlow](#lecture1)
 2. [TensorFlow Operations](#lecture2)
 3. [Basic Models in TensorFlow](#lecture3)
+    - [Linear Regression in TensorFlow](#lecture3a)
+    - [Logistic Regression in TensorFlow](#lecture3b)
+4. *Todo:* Eager execution
+5. [Manage Experiments](#lecture5)
 
 ## Overview of TensorFlow <a name="lecture1"></a>
 
@@ -47,11 +51,11 @@ Output:
 ```
 >>> 8
 ```
-The session evaluates the graph to fetch the value of `a`. 
-*Session* 
+The session evaluates the graph to fetch the value of `a`.
+*Session*
 - encapsulates the environment in which Operation objects are executed
 - allocates memory to store the value of variables
-*Tensor* 
+*Tensor*
 - the data that is evaluated
 
 Alternatively, the following code starts the session and closes the session after completion
@@ -151,15 +155,15 @@ tf.zeros_like(input_tensor) # [[0, 0], [0, 0], [0, 0]]
 
 ```python
 # Example parameter structure for a tensor filled with specific value
-tf.fill(dims, value, name=None) 
+tf.fill(dims, value, name=None)
 
-# Example implementation 
+# Example implementation
 tf.fill([2, 3], 8) # [[8, 8, 8], [8, 8, 8]]
 ```
 #### Sequences
 ```python
 # Constants as sequences
-tf.lin_space(start, stop, num, name=None) 
+tf.lin_space(start, stop, num, name=None)
 tf.lin_space(10.0, 13.0, 4) # [10. 11. 12. 13.]
 
 # Constants as a sequence from a range
@@ -183,17 +187,17 @@ tf.set_random_seed(seed)
 #### Variables
 ```python
 # create variables with tf.Variable
-s = tf.Variable(2, name="scalar") 
-m = tf.Variable([[0, 1], [2, 3]], name="matrix") 
+s = tf.Variable(2, name="scalar")
+m = tf.Variable([[0, 1], [2, 3]], name="matrix")
 W = tf.Variable(tf.zeros([784,10]))
 
 # create variables with tf.get_variable (preffered method)
-s = tf.get_variable("scalar", initializer=tf.constant(2)) 
+s = tf.get_variable("scalar", initializer=tf.constant(2))
 m = tf.get_variable("matrix", initializer=tf.constant([[0, 1], [2, 3]]))
 W = tf.get_variable("big_matrix", shape=(784, 10), initializer=tf.zeros_initializer())
 ```
 
-Variables need to be initialised. 
+Variables need to be initialised.
 - To initialise all variables:
 ```python
 with tf.Session() as sess:
@@ -222,8 +226,8 @@ Reassigning a variable when requires using the `tf.Variable.assign()` operation
 W = tf.Variable(10)
 assign_op = W.assign(100) # Remember this is an operation
 with tf.Session() as sess:
-  sess.run(W.initializer) # W has the value 10 (has not traversed the graph yet though) 
-  sess.run(assign_op) # W is updated to the value 100 (has not traversed the graph yet though) 
+  sess.run(W.initializer) # W has the value 10 (has not traversed the graph yet though)
+  sess.run(assign_op) # W is updated to the value 100 (has not traversed the graph yet though)
   print(W.eval())  # W is now 100
 ```
 
@@ -257,13 +261,13 @@ with tf.Session() as sess:
 
 ### Avoid Lazy Loading
 ```
-1. Separate definition of ops from computing/running ops 
+1. Separate definition of ops from computing/running ops
 2. Use Python property to ensure function is also loaded once the first time it is called
 ```
 
 ## Basic Models in TensorFlow<a name="lecture3"></a>
 
-### Linear Regression in TensorFlow
+### Linear Regression in TensorFlow <a name="lecture3a"></a>
 For a linear regression, we want to model the linear relationship between:
 - dependent variable Y
 - explanatory variables X
@@ -281,13 +285,16 @@ Inference: Y_predicted = w * X + b
 Mean squared error: E[(y - y_predicted)^2]
 ```
 
-**Code example**
-- `03_linreg_starter.py` 
+[**Code example**](!examples/03_linreg_starter.py)
+
+- `examples/03_linreg_starter.py`
+
 ```
 > python3 03_linreg_starter.py
 > tensorboard --logdir='./graphs'
 ```
-Some Code notes from Example
+
+**Some Code notes from Example**
 ```python
 tf.data.Dataset.from_tensor_slices((features, labels))
 
@@ -299,7 +306,7 @@ tf.data.TextLineDataset(filenames)
 tf.data.FixedLengthRecordDataset(filenames)
 tf.data.TFRecordDataset(filenames)
 ```
-Making an Iterator
+**Making an Iterator**
 ```python
 iterator = dataset.make_one_shot_iterator()
 # Iterates through the dataset exactly once. No need to initialization.
@@ -308,7 +315,7 @@ iterator = dataset.make_initializable_iterator()
 #Iterates through the dataset as many times as we want. Need to initialize with each epoch.
 ```
 
-Performing Operations on the dataset
+**Performing Operations on the dataset**
 ```python
 dataset = dataset.shuffle(1000)
 dataset = dataset.repeat(100)
@@ -316,12 +323,12 @@ dataset = dataset.batch(128)
 dataset = dataset.map(lambda x: tf.one_hot(x, 10))  # convert each elem of dataset to one_hot vector
 ```
 
-Specify if you want to train the variable
+**Specify if you want to train the variable**
 ```python
 tf.Variable(initial_value=None, trainable=True,...)
 ```
 
-List of Optimizers in TensorFlow
+**List of Optimizers in TensorFlow**
 ```python
 tf.train.GradientDescentOptimizer
 tf.train.AdagradOptimizer
@@ -331,7 +338,7 @@ tf.train.FtrlOptimizer
 tf.train.RMSPropOptimizer
 ```
 
-### Logistic Regression in TensorFlow
+### Logistic Regression in TensorFlow <a name="lecture3b"></a>
 
 ```
 MNIST Database
@@ -345,9 +352,18 @@ Inference: Y_predicted = softmax(X * w + b)
 Cross entropy loss: -log(Y_predicted)
 ```
 
+[**Code example**](!examples/03_logreg_starter.py)
+
+- `examples/03_logreg_starter.py`
+
+```
+> python3 03_logreg_starter.py
+> tensorboard --logdir='./graphs'
+```
+
 **Mutliple Iterators**
 ```python
-iterator = tf.data.Iterator.from_structure(train_data.output_types, 
+iterator = tf.data.Iterator.from_structure(train_data.output_types,
                                            train_data.output_shapes)
 img, label = iterator.get_next()
 
@@ -356,4 +372,50 @@ test_init = iterator.make_initializer(test_data)	# initializer for train_data
 
 # During Training
 sess.run(train_init)               # use train_init during training loop
+```
+
+## Manage Experiments <a name="lecture5"></a>
+
+### Word Embeddings in TensorFlow <a name="lecture5a"></a>
+
+**Word Embedding**
+
+*Representing a word by means of its neighbors*
+- Distributed representation
+- Continuous values
+- Low dimension
+- Capture the semantic relationships between words
+
+#### CBOW vs Skip-Gram
+
+**CBOW**
+
+- predicts center words from context words
+- many-to-one
+- better for smaller datasets (entire context as one observation)
+
+**Skip-gram**
+- predicts source context-words from the center words
+- one-to-many
+- treats each context-target pair as new observation
+
+**Embedding Lookup**
+```python
+tf.nn.embedding_lookup(params, ids, partition_strategy='mod', name=None, validate_indices=True, max_norm=None)
+```
+**NCE Loss (Alternative to Softmax)**
+```python
+tf.nn.nce_loss(
+    weights,
+    biases,
+    labels,
+    inputs,
+    num_sampled,
+    num_classes,
+    num_true=1,
+    sampled_values=None,
+    remove_accidental_hits=False,
+    partition_strategy='mod',
+    name='nce_loss'
+)
 ```
