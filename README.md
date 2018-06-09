@@ -419,3 +419,192 @@ tf.nn.nce_loss(
     name='nce_loss'
 )
 ```
+
+**Phase 1: Assembling the Graph**
+1. Import data (with tf.data or placeholders)
+2. Define the weights
+3. Define the inference model
+4. Define loss function
+5. Define optimizer
+
+**Model Reuse with Object Oriented Programming**
+
+Example from `examples/04_word2vec_visualize.py` shows a good end to end approach
+```python
+class SkipGramModel:
+    """ Build the graph for word2vec model """
+    def __init__(self, params):
+        pass
+
+    def _import_data(self):
+        """ Step 1: import data """
+        pass
+
+    def _create_embedding(self):
+        """ Step 2: define weights. In word2vec, it's actually the weights that we care about """
+        pass
+
+    def _create_loss(self):
+        """ Step 3 + 4: define the inference + the loss function """
+        pass
+
+    def _create_optimizer(self):
+        """ Step 5: define optimizer """
+        pass
+```
+
+### Name scope
+Group nodes together with tf.name_scope(name)
+
+```python
+with tf.name_scope('data'):
+    iterator = dataset.make_initializable_iterator()
+    center_words, target_words = iterator.get_next()
+with tf.name_scope('embed'):
+    embed_matrix = tf.get_variable('embed_matrix',
+                                    shape=[VOCAB_SIZE, EMBED_SIZE], ...)
+    embed = tf.nn.embedding_lookup(embed_matrix, center_words)
+with tf.name_scope('loss'):
+    nce_weight = tf.get_variable('nce_weight', shape=[VOCAB_SIZE, EMBED_SIZE], ...)
+    nce_bias = tf.get_variable('nce_bias', initializer=tf.zeros([VOCAB_SIZE]))
+    loss = tf.reduce_mean(tf.nn.nce_loss(weights=nce_weight, biases=nce_bias, …)
+with tf.name_scope('optimizer'):
+    optimizer = tf.train.GradientDescentOptimizer(LEARNING_RATE).minimize(loss)
+```
+
+### Variable scope
+
+Use `get_variable` as then you will know if you are reusing existing graph or creating a new tensor for each input. Easier to debug.
+```python
+tf.get_variable(<name>, <shape>, <initializer>)
+
+# If a variable with <name> already exists, reuse it
+# If not, initialize it with <shape> using <initializer>
+
+def two_hidden_layers(x):
+    assert x.shape.as_list() == [200, 100]
+    w1 = tf.get_variable("h1_weights", [100, 50], initializer=tf.random_normal_initializer())
+    b1 = tf.get_variable("h1_biases", [50], initializer=tf.constant_initializer(0.0))
+    h1 = tf.matmul(x, w1) + b1
+    assert h1.shape.as_list() == [200, 50]  
+    w2 = tf.get_variable("h2_weights", [50, 10], initializer=tf.random_normal_initializer())
+    b2 = tf.get_variable("h2_biases", [10], initializer=tf.constant_initializer(0.0))
+    logits = tf.matmul(h1, w2) + b2
+    return logits
+
+with tf.variable_scope('two_layers') as scope:
+    logits1 = two_hidden_layers(x1)
+    scope.reuse_variables() # note this line to ensure same tensors are used.
+    logits2 = two_hidden_layers(x2)
+
+```
+
+Alternatively creating scope (same as above code):
+```python
+def fully_connected(x, output_dim, scope):
+    with tf.variable_scope(scope, reuse=tf.AUTO_REUSE) as scope:
+        w = tf.get_variable("weights", [x.shape[1], output_dim], initializer=tf.random_normal_initializer())
+        b = tf.get_variable("biases", [output_dim], initializer=tf.constant_initializer(0.0))
+        return tf.matmul(x, w) + b
+
+def two_hidden_layers(x):
+    h1 = fully_connected(x, 50, 'h1')
+    h2 = fully_connected(h1, 10, 'h2')
+
+with tf.variable_scope('two_layers') as scope:
+    logits1 = two_hidden_layers(x1)
+    logits2 = two_hidden_layers(x2)
+```
+
+### Saving Sessions
+```python
+tf.train.Saver.save(sess, save_path, global_step=None...)
+tf.train.Saver.restore(sess, save_path)
+```
+
+**Example**
+
+```python
+# Within the Model Class
+global_step = tf.Variable(0, dtype=tf.int32, trainable=False, name='global_step')
+optimizer = tf.train.AdamOptimizer(lr).minimize(loss, global_step=global_step)
+
+# define model
+model = SkipGramModel(params)
+
+# create a saver object
+saver = tf.train.Saver()
+
+with tf.Session() as sess:
+    for step in range(training_steps):
+        sess.run([optimizer])
+
+        # save model every 1000 steps
+        if (step + 1) % 1000 == 0:
+            saver.save(sess, 'checkpoint_directory/model_name', global_step=step)
+```
+
+**Saving specific variables**
+```python
+#Can also choose to save certain variables
+v1 = tf.Variable(..., name='v1')
+v2 = tf.Variable(..., name='v2')
+
+#You can save your variables in one of three ways:
+saver = tf.train.Saver({'v1': v1, 'v2': v2})
+saver = tf.train.Saver([v1, v2])
+saver = tf.train.Saver({v.op.name: v for v in [v1, v2]}) # similar to a dict
+```
+**Restoring session variables**
+```python
+saver.restore(sess, 'checkpoints/name_of_the_checkpoint')
+
+# RESTORING LATEST CHECKPOINT
+# check if there is checkpoint
+ckpt = tf.train.get_checkpoint_state(os.path.dirname('checkpoints/checkpoint'))
+
+# check if there is a valid checkpoint path
+if ckpt and ckpt.model_checkpoint_path:
+     saver.restore(sess, ckpt.model_checkpoint_path)
+```
+
+### Creating summaries
+```python
+# Step 1: Creating Summaries
+with tf.name_scope("summaries"):
+    tf.summary.scalar("loss", self.loss)
+    tf.summary.scalar("accuracy", self.accuracy)            
+    tf.summary.histogram("histogram loss", self.loss)
+    summary_op = tf.summary.merge_all()
+
+# Step 2: Running Summaries
+loss_batch, _, summary = sess.run([loss, optimizer, summary_op])
+
+# Step 3: Writing summaries to file
+writer.add_summary(summary, global_step=step)
+```
+
+### Controlling Randomness
+```python
+my_var = tf.Variable(tf.truncated_normal((-1.0,1.0), stddev=0.1, seed=0))
+tf.set_random_seed(2)
+```
+
+### Gradients
+```python
+x = tf.Variable(2.0)
+y = 2.0 * (x ** 3)
+z = 3.0 + y ** 2
+grad_z = tf.gradients(z, [x, y])
+with tf.Session() as sess:
+    sess.run(x.initializer)
+    print(sess.run(grad_z)) # >> [768.0, 32.0]
+# 768 is the gradient of z with respect to x, 32 with respect to y
+
+# Gradient Computation
+tf.gradients(ys, xs, grad_ys=None, ...)
+tf.stop_gradient(input, name=None)
+# prevents the contribution of its inputs to be taken into account
+tf.clip_by_value(t, clip_value_min, clip_value_max, name=None)
+tf.clip_by_norm(t, clip_norm, axes=None, name=None)
+```
