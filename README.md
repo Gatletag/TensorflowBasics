@@ -8,9 +8,10 @@ Notes on how to use TensorFlow, heavily based on the Stanford University Tensorf
 3. [Basic Models in TensorFlow](#lecture3)
     - [Linear Regression in TensorFlow](#lecture3a)
     - [Logistic Regression in TensorFlow](#lecture3b)
-4. *Todo:* Eager execution
-5. [Manage Experiments](#lecture5)
-6. [Convolutions in TensorFlow](#lecture6)
+4. [Manage Experiments](#lecture5)
+5. [Convolutions in TensorFlow](#lecture6)
+6. [TFRecord](#lecture7)
+7. [Introduction to RNNs](#lecture11)
 
 ## Overview of TensorFlow <a name="lecture1"></a>
 
@@ -681,4 +682,183 @@ dropout = tf.layers.dropout(fc,
                           training=self.training,
                           name='dropout')
 
+```
+
+## TFRecord <a name="lecture7"></a>
+
+1. The recommended format for TensorFlow
+2. Binary file format (a serialized `tf.train.Example` protobuf object)
+
+### Convert to TFRecord format
+```python
+# Step 1: create a writer to write tfrecord to that file
+writer = tf.python_io.TFRecordWriter(out_file)
+
+# Step 2: get serialized shape and values of the image
+shape, binary_image = get_image_binary(image_file)
+
+# Step 3: create a tf.train.Features object
+features = tf.train.Features(feature={'label': _int64_feature(label),
+                                    'shape': _bytes_feature(shape),
+                                    'image': _bytes_feature(binary_image)})
+
+# Step 4: create a sample containing of features defined above
+sample = tf.train.Example(features=features)
+
+# Step 5: write the sample to the tfrecord file
+writer.write(sample.SerializeToString())
+writer.close()
+
+```
+
+```python
+def _int64_feature(value):
+    return tf.train.Feature(int64_list=tf.train.Int64List(value=[value]))
+
+def _bytes_feature(value):
+    return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
+```
+
+### Read TFRecord
+```python
+dataset = tf.data.TFRecordDataset(tfrecord_files)
+# Parse each tfrecord_file into different features that we want
+# In this case, a tuple of (label, shape, image)
+dataset = dataset.map(_parse_function)
+
+def _parse_function(tfrecord_serialized):
+    features={'label': tf.FixedLenFeature([], tf.int64),
+              'shape': tf.FixedLenFeature([], tf.string),
+              'image': tf.FixedLenFeature([], tf.string)}
+
+    parsed_features = tf.parse_single_example(tfrecord_serialized, features)
+
+    return parsed_features['label'], parsed_features['shape'], parsed_features['image']
+```
+
+### Style Transfer
+
+**Loss function**
+- Content loss
+  - Measure the content loss between the content of the generated  image and the content of the content image
+  - Measure the loss between the feature maps in the content layer of the generated  image and the content image
+
+- Style loss
+  - Measure the style loss between the style of the generated  image and the style of the style image
+  - Measure the loss between the feature maps in the style layers of the generated  image and the style image
+
+
+**Content / Style of an Image**
+Feature visualization have shown that:
+- lower layers extract features related to content
+- higher layers extract features related to style
+
+## Introduction to RNNs <a name="lecture11"></a>
+
+### Cell Support `(tf.nn.rnn_cell)`
+
+- *BasicRNNCell*: The most basic RNN cell.
+- *RNNCell*: Abstract object representing an RNN cell.
+- *BasicLSTMCell*: Basic LSTM recurrent network cell.
+- *LSTMCell*: LSTM recurrent network cell.
+- *GRUCell*: Gated Recurrent Unit cell
+
+### Cell Construction
+```python
+cell = tf.nn.rnn_cell.GRUCell(hidden_size)
+
+# Stacking Multiple Cells
+layers = [tf.nn.rnn_cell.GRUCell(size) for size in hidden_sizes]
+cells = tf.nn.rnn_cell.MultiRNNCell(layers)
+
+# Construct Recurrent Neural Network
+tf.nn.dynamic_rnn # uses a tf.While loop to dynamically construct the graph when it is executed. Graph creation is faster and you can feed batches of variable size.
+tf.nn.bidirectional_dynamic_rnn # dynamic_rnn with bidirectional
+
+# if all sequence lengths are the same
+output, out_state = tf.nn.dynamic_rnn(cell, seq, length, initial_state)
+```
+
+#### Approaches to Padded/truncated sequence length
+
+**Approach 1**
+
+Maintain a mask (True for real, False for padded tokens)
+Run your model on both the real/padded tokens (model will predict labels for the padded tokens as well)
+Only take into account the loss caused by the real elements
+
+```python
+full_loss = tf.nn.softmax_cross_entropy_with_logits(preds, labels)
+loss = tf.reduce_mean(tf.boolean_mask(full_loss, mask))
+```
+
+**Approach 2**
+
+Let your model know the real sequence length so it only predict the labels for the real tokens
+
+```python
+cell = tf.nn.rnn_cell.GRUCell(hidden_size)
+rnn_cells = tf.nn.rnn_cell.MultiRNNCell([cell] * num_layers)
+tf.reduce_sum(tf.reduce_max(tf.sign(seq), 2), 1)
+output, out_state = tf.nn.dynamic_rnn(cell, seq, length, initial_state)
+```
+## Tips and Tricks <a name="lecture11a"></a>
+
+**Vanishing Gradients**
+
+Use different activation units:
+```
+tf.nn.relu
+tf.nn.relu6
+tf.nn.crelu
+tf.nn.elu
+```
+
+In addition to:
+```
+tf.nn.softplus
+tf.nn.softsign
+tf.nn.bias_add
+tf.sigmoid
+tf.tanh
+```
+
+**Exploding Gradients**
+
+Clip gradients with tf.clip_by_global_norm
+```python
+gradients = tf.gradients(cost, tf.trainable_variables())
+# take gradients of cosst w.r.t. all trainable variables
+
+clipped_gradients, _ = tf.clip_by_global_norm(gradients, max_grad_norm)
+# clip the gradients by a pre-defined max norm
+
+optimizer = tf.train.AdamOptimizer(learning_rate)
+train_op = optimizer.apply_gradients(zip(gradients, trainables))
+# add the clipped gradients to the optimizer
+
+```
+
+**Anneal the learning rate**
+```python
+learning_rate = tf.train.exponential_decay(init_lr,
+                                           global_step,
+                                           decay_steps,
+                                           decay_rate,
+                                           staircase=True)
+optimizer = tf.train.AdamOptimizer(learning_rate)
+```
+
+**Overfitting**
+
+Use dropout through tf.nn.dropout or DropoutWrapper for cells
+```python
+tf.nn.dropout
+
+hidden_layer = tf.nn.dropout(hidden_layer, keep_prob)
+
+# DropoutWrapper
+cell = tf.nn.rnn_cell.GRUCell(hidden_size)
+cell = tf.nn.rnn_cell.DropoutWrapper(cell,     
+                                    output_keep_prob=keep_prob)
 ```
