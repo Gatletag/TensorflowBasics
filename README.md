@@ -346,7 +346,7 @@ Cross entropy loss: -log(Y_predicted)
 ```
 
 **Mutliple Iterators**
-```
+```python
 iterator = tf.data.Iterator.from_structure(train_data.output_types, 
                                            train_data.output_shapes)
 img, label = iterator.get_next()
