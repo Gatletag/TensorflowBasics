@@ -268,8 +268,6 @@ For a linear regression, we want to model the linear relationship between:
 - dependent variable Y
 - explanatory variables X
 
-### Example
-
 ```
 World Development Indicators dataset
 X: birth rate
@@ -331,4 +329,31 @@ tf.train.MomentumOptimizer
 tf.train.AdamOptimizer
 tf.train.FtrlOptimizer
 tf.train.RMSPropOptimizer
+```
+
+### Logistic Regression in TensorFlow
+
+```
+MNIST Database
+X: image of a handwritten digit
+Y: the digit value
+GOAL: Recognize the digit in the image
+```
+**Model**
+```
+Inference: Y_predicted = softmax(X * w + b)
+Cross entropy loss: -log(Y_predicted)
+```
+
+**Mutliple Iterators**
+```
+iterator = tf.data.Iterator.from_structure(train_data.output_types, 
+                                           train_data.output_shapes)
+img, label = iterator.get_next()
+
+train_init = iterator.make_initializer(train_data)	# initializer for train_data
+test_init = iterator.make_initializer(test_data)	# initializer for train_data
+
+# During Training
+sess.run(train_init)               # use train_init during training loop
 ```
