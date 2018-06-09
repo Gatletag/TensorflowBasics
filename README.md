@@ -288,7 +288,7 @@ Mean squared error: E[(y - y_predicted)^2]
 > tensorboard --logdir='./graphs'
 ```
 Some Code notes from Example
-```
+```python
 tf.data.Dataset.from_tensor_slices((features, labels))
 
 dataset = tf.data.Dataset.from_tensor_slices((data[:,0], data[:,1]))
@@ -300,7 +300,7 @@ tf.data.FixedLengthRecordDataset(filenames)
 tf.data.TFRecordDataset(filenames)
 ```
 Making an Iterator
-```
+```python
 iterator = dataset.make_one_shot_iterator()
 # Iterates through the dataset exactly once. No need to initialization.
 
