@@ -10,6 +10,7 @@ Notes on how to use TensorFlow, heavily based on the Stanford University Tensorf
     - [Logistic Regression in TensorFlow](#lecture3b)
 4. *Todo:* Eager execution
 5. [Manage Experiments](#lecture5)
+6. [Convolutions in TensorFlow](#lecture6)
 
 ## Overview of TensorFlow <a name="lecture1"></a>
 
@@ -607,4 +608,77 @@ tf.stop_gradient(input, name=None)
 # prevents the contribution of its inputs to be taken into account
 tf.clip_by_value(t, clip_value_min, clip_value_max, name=None)
 tf.clip_by_norm(t, clip_norm, axes=None, name=None)
+```
+
+## Convolutions in TensorFlow <a name="lecture5"></a>
+
+**Convolutions**
+```python
+tf.nn.conv2d(
+    input, # Batch size (N) x Height (H) x Width (W) x Channels (C)
+    filter, # Height x Width x Input Channels x Output Channels
+    strides, # 4 element 1-D tensor, strides in each direction
+    padding, # 'SAME' or 'VALID'
+    use_cudnn_on_gpu=True,
+    data_format='NHWC',
+    dilations=[1, 1, 1, 1],
+    name=None
+)
+```
+
+### Padding
+
+- "VALID"
+only ever drops the right-most columns (or bottom-most rows).
+- "SAME" tries to pad evenly left and right, but if the amount of columns to be added is odd, it will add the extra column to the right, as is the case in this example (the same logic applies vertically: there may be an extra row of zeros at the bottom).
+
+### Dimensions
+```
+Calculating Dimensions=> (W−F+2P)/S+ 1
+
+W: input width / depth    
+F: filter width/depth
+P: padding            
+S: stride
+```
+
+**Max Pooling**
+```python
+pool1 = tf.nn.max_pool(conv1,
+  ksize=[1, 2, 2, 1],
+  strides=[1, 2, 2, 1],
+  padding='SAME')
+```
+
+**Loss function**
+```python
+Loss function
+tf.nn.softmax_cross_entropy_with_logits(labels=Y, logits=logits)
+#Predict
+tf.nn.softmax(logits_batch)
+```
+
+### TensorFlow Layers
+```python
+# Convolutional Layers
+conv1 = tf.layers.conv2d(inputs=self.img,
+                                  filters=32,
+                                  kernel_size=[5, 5],
+                                  padding='SAME',
+                                  activation=tf.nn.relu,
+                                  name='conv1')
+# Max pooling
+pool1 = tf.layers.max_pooling2d(inputs=conv1,
+                                        pool_size=[2, 2],
+                                        strides=2,
+                                        name='pool1')
+# Dense Layer        
+fc = tf.layers.dense(pool2, 1024, activation=tf.nn.relu, name='fc')
+
+# Dropout for training only
+dropout = tf.layers.dropout(fc,
+                          self.keep_prob,
+                          training=self.training,
+                          name='dropout')
+
 ```
